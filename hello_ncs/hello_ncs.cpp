@@ -20,7 +20,6 @@
 #include "mvnc.h"
 #include <stdlib.h>
 
-// somewhat arbitrary buffer size for the device name
 #define NAME_SIZE 100
 #define GRAPH_FILE_NAME "graph"
 
@@ -53,6 +52,15 @@ void* LoadFile(const char *filename, unsigned int *len) {
   *len = filesize;
   fread(p, sizeof(char), filesize, fpr);
   return p;
+}
+
+
+void UnloadFile(void* p) {
+  if (p != NULL) { 
+    free(p);
+    p = NULL;
+  }
+  return;
 }
 
 int main(int argc, char** argv)
@@ -108,6 +116,8 @@ int main(int argc, char** argv)
       retCode = mvncDeallocateGraph(graphHandle);
       graphHandle = NULL;
     }
+
+    UnloadFile(graphFileBuf);
 
     retCode = mvncCloseDevice(deviceHandle);
     deviceHandle = NULL;
