@@ -147,6 +147,7 @@ int main(int argc, char** argv)
     // floats to half precision floats.
     // Return pointer to the buffer of half precision floats. 
     imageBufFp16 = LoadImage("image.png", networkDim, networkMean);
+    
     // Start the inference with mvncLoadTensor()
     retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
     UnloadImage(imageBufFp16);
@@ -156,7 +157,7 @@ int main(int argc, char** argv)
     }
     printf("Successfuly load tensor. \n");
 
-    //TODO : get result
+    //TODO : get result from graph
 
     //Deallocate graph and remove handle.
     retCode = mvncDeallocateGraph(graphHandle);
