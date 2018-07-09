@@ -90,12 +90,9 @@ int main(int argc, char** argv)
     mvncStatus retCode;
     void *deviceHandle;
     char devName[NAME_SIZE];
-    // Load an image from disk.
-    // LoadImage will read image from disk, convert channels to floats.
-    // Subtract network mean for each value in each channel. Then convert
-    // floats to half precision floats.
-    // Return pointer to the buffer of half precision floats. 
-    half* imageBufFp16;
+    unsigned int graphFileLen;
+    void* graphFileBuf = NULL;
+    half* imageBufFp16 = NULL;
         
     // Calculate the length of the buffer that contains the half precision floats.
     // 3 channels * width * height * sizeof a 16-bit float 
@@ -127,8 +124,7 @@ int main(int argc, char** argv)
     // Now read in a graph file so graphFileBuf will point to the 
     // bytes of the file in a memory buffer and graphFileLen will be
     // set to the number of bytes in the graph file and memory buffer.
-    unsigned int graphFileLen;
-    void* graphFileBuf = LoadFile(GRAPH_FILE_NAME, &graphFileLen);
+    graphFileBuf = LoadFile(GRAPH_FILE_NAME, &graphFileLen);
     if (graphFileBuf == NULL) {
       printf("Failed to load graph file\n");
       goto close_device;
@@ -145,7 +141,11 @@ int main(int argc, char** argv)
     }
     printf("Successfuly allocate graph.\n");
 
-    //load image.
+    // Load an image from disk.
+    // LoadImage will read image from disk, convert channels to floats.
+    // Subtract network mean for each value in each channel. Then convert
+    // floats to half precision floats.
+    // Return pointer to the buffer of half precision floats. 
     imageBufFp16 = LoadImage("image.png", networkDim, networkMean);
     // Start the inference with mvncLoadTensor()
     retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
