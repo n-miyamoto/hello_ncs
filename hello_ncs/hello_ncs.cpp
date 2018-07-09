@@ -90,12 +90,24 @@ int main(int argc, char** argv)
     mvncStatus retCode;
     void *deviceHandle;
     char devName[NAME_SIZE];
+    // Load an image from disk.
+    // LoadImage will read image from disk, convert channels to floats.
+    // Subtract network mean for each value in each channel. Then convert
+    // floats to half precision floats.
+    // Return pointer to the buffer of half precision floats. 
+    half* imageBufFp16;
+        
+    // Calculate the length of the buffer that contains the half precision floats.
+    // 3 channels * width * height * sizeof a 16-bit float 
+    unsigned int lenBufFp16 = 3*networkDim*networkDim*sizeof(*imageBufFp16);
+
+
     retCode = mvncGetDeviceName(0, devName, NAME_SIZE);
     if (retCode != MVNC_OK)
     {   // failed to get device name, maybe none plugged in.
         printf("Error - No NCS devices found.\n");
 	      printf("    mvncStatus value: %d\n", retCode);
-		return 0;
+		    return 0;
     }
 
     // Try to open the NCS device via the device name
@@ -118,56 +130,43 @@ int main(int argc, char** argv)
     unsigned int graphFileLen;
     void* graphFileBuf = LoadFile(GRAPH_FILE_NAME, &graphFileLen);
     if (graphFileBuf == NULL) {
-      printf("Failed to load fraph\n");
-      return 0;
+      printf("Failed to load graph file\n");
+      goto close_device;
     }
 
     // Allocate the graph
     void* graphHandle;
     retCode = mvncAllocateGraph(deviceHandle, &graphHandle, graphFileBuf, graphFileLen);
+    UnloadFile(graphFileBuf);
     if (retCode != MVNC_OK)
     {   // Error allocating graph
       printf("Could not allocate graph for file: %s\n", GRAPH_FILE_NAME);
+      goto close_device;
     }
     printf("Successfuly allocate graph.\n");
 
-
-    //
-    // Load an image from disk.
-    // LoadImage will read image from disk, convert channels to floats.
-    // Subtract network mean for each value in each channel. Then convert
-    // floats to half precision floats.
-    // Return pointer to the buffer of half precision floats. 
-    half* imageBufFp16 = LoadImage("image.png", networkDim, networkMean);
-        
-    // Calculate the length of the buffer that contains the half precision floats.
-    // 3 channels * width * height * sizeof a 16-bit float 
-    unsigned int lenBufFp16 = 3*networkDim*networkDim*sizeof(*imageBufFp16);
-
+    //load image.
+    imageBufFp16 = LoadImage("image.png", networkDim, networkMean);
     // Start the inference with mvncLoadTensor()
-    char tmp[1000];
-    unsigned int datalen=0;
     retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
+    UnloadImage(imageBufFp16);
     if (retCode != MVNC_OK){
-      mvncGetGraphOption(graphHandle, MVNC_DEBUG_INFO, tmp, &datalen);
-      printf("%s\n", tmp);
-      
+      printf("failed to load tensor.\n");
+      goto close_device;
     }
-    else {
-      printf("Successfuly load tensor. \n");
-    }
+    printf("Successfuly load tensor. \n");
 
+    //TODO : get result
 
     //Deallocate graph and remove handle.
     retCode = mvncDeallocateGraph(graphHandle);
     graphHandle = NULL;
 
 
-    //Unload Image ans graph.
-    UnloadImage(imageBufFp16);
-    UnloadFile(graphFileBuf);
-
+    //close device
+close_device:
     retCode = mvncCloseDevice(deviceHandle);
+
     deviceHandle = NULL;
     if (retCode != MVNC_OK)
     {
