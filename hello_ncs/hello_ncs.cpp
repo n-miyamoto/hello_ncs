@@ -21,8 +21,12 @@
 #include <stdlib.h>
 
 #define NAME_SIZE 100
-#define GRAPH_FILE_NAME "graph"
+//#define GRAPH_FILE_NAME "inceptionv3.graph"
+#define GRAPH_FILE_NAME "ssd.graph"
 
+typedef unsigned short half;
+const int networkDim = 300;
+float networkMean[] = {0.40787054*255.0, 0.45752458*255.0, 0.48109378*255.0};
 
 void* LoadFile(const char *filename, unsigned int *len) {
   void *p=NULL;
@@ -59,6 +63,24 @@ void UnloadFile(void* p) {
   if (p != NULL) { 
     free(p);
     p = NULL;
+  }
+  return;
+}
+
+
+half* LoadImage(const char* str, int networkDim, float* networkMean) {
+  half* img;
+  size_t sz = 3 * networkDim * networkDim * sizeof(*img);
+  img = (half*)malloc(sz);
+  memset(img, 0, sz);
+  //TODO: load image from file or camera.
+  
+  return img;
+} 
+
+void UnloadImage(half* img) {
+  if (img != NULL) {
+    free(img);
   }
   return;
 }
@@ -107,16 +129,42 @@ int main(int argc, char** argv)
     {   // Error allocating graph
       printf("Could not allocate graph for file: %s\n", GRAPH_FILE_NAME);
     }
-    else
-    {   // Successfully allocated graph. Now graphHandle is ready to go.  
-        // Use graphHandle for other API calls and call mvncDeallocateGraph
-        // when done with it.
-      printf("Successfully allocated graph for %s\n", GRAPH_FILE_NAME);
+    printf("Successfuly allocate graph.\n");
 
-      retCode = mvncDeallocateGraph(graphHandle);
-      graphHandle = NULL;
+
+    //
+    // Load an image from disk.
+    // LoadImage will read image from disk, convert channels to floats.
+    // Subtract network mean for each value in each channel. Then convert
+    // floats to half precision floats.
+    // Return pointer to the buffer of half precision floats. 
+    half* imageBufFp16 = LoadImage("image.png", networkDim, networkMean);
+        
+    // Calculate the length of the buffer that contains the half precision floats.
+    // 3 channels * width * height * sizeof a 16-bit float 
+    unsigned int lenBufFp16 = 3*networkDim*networkDim*sizeof(*imageBufFp16);
+
+    // Start the inference with mvncLoadTensor()
+    char tmp[1000];
+    unsigned int datalen=0;
+    retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
+    if (retCode != MVNC_OK){
+      mvncGetGraphOption(graphHandle, MVNC_DEBUG_INFO, tmp, &datalen);
+      printf("%s\n", tmp);
+      
+    }
+    else {
+      printf("Successfuly load tensor. \n");
     }
 
+
+    //Deallocate graph and remove handle.
+    retCode = mvncDeallocateGraph(graphHandle);
+    graphHandle = NULL;
+
+
+    //Unload Image ans graph.
+    UnloadImage(imageBufFp16);
     UnloadFile(graphFileBuf);
 
     retCode = mvncCloseDevice(deviceHandle);
