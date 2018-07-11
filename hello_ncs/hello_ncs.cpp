@@ -173,6 +173,9 @@ int main(int argc, char** argv)
     unsigned int graphFileLen;
     void* graphFileBuf = NULL;
     half* imageBufFp16 = NULL;
+    void* resultData16 = NULL;
+    void* userParam = NULL;
+    unsigned int lenResultData=0;
         
     // Calculate the length of the buffer that contains the half precision floats.
     // 3 channels * width * height * sizeof a 16-bit float 
@@ -238,10 +241,25 @@ int main(int argc, char** argv)
     printf("Successfuly load tensor. \n");
 
     //TODO : get result from graph
-
+    retCode = mvncGetResult(graphHandle, &resultData16, &lenResultData, &userParam);
+    if (retCode != MVNC_OK)
+    {
+      printf("failed to get result.\n");
+      goto close_device;
+    }
+    printf("Successfuly get result. \n");
+    printf("resultData is %d bytes which is %d 16-bit floats.\n", lenResultData, lenResultData/(int)sizeof(half));
+    
+    for (int i = 0; i < 707; i++) {
+      printf("%d, %d\n",i, *( (half*)resultData16+i ) );
+    }
+    
+    
     //Deallocate graph and remove handle.
     retCode = mvncDeallocateGraph(graphHandle);
     graphHandle = NULL;
+
+    
 
 
     //close device
