@@ -19,6 +19,12 @@
 #include "stdafx.h"
 #include "mvnc.h"
 #include <stdlib.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "stb_image_resize.h"
+#include "fp16.h"
+
 
 #define NAME_SIZE 100
 //#define GRAPH_FILE_NAME "inceptionv3.graph"
@@ -67,7 +73,80 @@ void UnloadFile(void* p) {
   return;
 }
 
+// Reads an image file from disk (8 bit per channel RGB .jpg or .png or other formats 
+// supported by stbi_load.)  Resizes it, subtracts the mean from each channel, and then 
+// converts to an array of half precision floats that is suitable to pass to mvncLoadTensor.  
+// The returned array will contain 3 floats for each pixel in the image the first float 
+// for a pixel is it's the Blue channel value the next is Green and then Red.  The array 
+// contains the pixel values in row major order.
+// Param path is a pointer to a null terminated string that must be set to the path of the 
+//            to read before calling.
+// Param reqsize must be set to the width and height that the image will be resized to.  
+//               Its assumed width and height are the same size.
+// Param mean must be set to point to an array of 3 floating point numbers.  The three
+//            numbers are the mean values for the blue, green, and red channels in that order.
+//            each B, G, and R value from the image will have this value subtracted from it.
+// Returns a pointer to a buffer that is allocated internally via malloc.  this buffer contains
+//         the 16 bit float values that can be passed to mvncLoadTensor().  The returned buffer 
+//         will contain reqSize*reqSize*3 half floats.
+half *LoadImage(const char *path, int reqSize, float *mean)
+{
+	int width, height, cp, i;
+	unsigned char *img, *imgresized;
+	float *imgfp32;
+	half *imgfp16;
 
+	img = stbi_load(path, &width, &height, &cp, 3);
+	if(!img)
+	{
+		printf("Error - the image file %s could not be loaded\n", path);
+		return NULL;
+	}
+	imgresized = (unsigned char*) malloc(3*reqSize*reqSize);
+	if(!imgresized)
+	{
+		free(img);
+		perror("malloc");
+		return NULL;
+	}
+	stbir_resize_uint8(img, width, height, 0, imgresized, reqSize, reqSize, 0, 3);
+	free(img);
+	imgfp32 = (float*) malloc(sizeof(*imgfp32) * reqSize * reqSize * 3);
+	if(!imgfp32)
+	{
+		free(imgresized);
+		perror("malloc");
+		return NULL;
+	}
+	for(i = 0; i < reqSize * reqSize * 3; i++)
+		imgfp32[i] = imgresized[i];
+	free(imgresized);
+	imgfp16 = (half*) malloc(sizeof(*imgfp16) * reqSize * reqSize * 3);
+	if(!imgfp16)
+	{
+		free(imgfp32);
+		perror("malloc");
+		return NULL;
+	}
+	for(i = 0; i < reqSize*reqSize; i++)
+	{
+		float blue, green, red;
+                blue = imgfp32[3*i+2];
+                green = imgfp32[3*i+1];
+                red = imgfp32[3*i+0];
+
+                imgfp32[3*i+0] = blue-mean[0];
+                imgfp32[3*i+1] = green-mean[1]; 
+                imgfp32[3*i+2] = red-mean[2];
+
+                // uncomment to see what values are getting passed to mvncLoadTensor() before conversion to half float
+                //printf("Blue: %f, Grean: %f,  Red: %f \n", imgfp32[3*i+0], imgfp32[3*i+1], imgfp32[3*i+2]);
+	}
+	floattofp16((unsigned char *)imgfp16, imgfp32, 3*reqSize*reqSize);
+	free(imgfp32);
+	return imgfp16;
+}
+/*
 half* LoadImage(const char* str, int networkDim, float* networkMean) {
   half* img;
   size_t sz = 3 * networkDim * networkDim * sizeof(*img);
@@ -77,6 +156,7 @@ half* LoadImage(const char* str, int networkDim, float* networkMean) {
   
   return img;
 } 
+*/
 
 void UnloadImage(half* img) {
   if (img != NULL) {
@@ -146,7 +226,7 @@ int main(int argc, char** argv)
     // Subtract network mean for each value in each channel. Then convert
     // floats to half precision floats.
     // Return pointer to the buffer of half precision floats. 
-    imageBufFp16 = LoadImage("image.png", networkDim, networkMean);
+    imageBufFp16 = LoadImage("image.jpg", networkDim, networkMean);
     
     // Start the inference with mvncLoadTensor()
     retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);

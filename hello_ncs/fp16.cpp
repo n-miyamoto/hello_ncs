@@ -1,4 +1,5 @@
 #include "fp16.h"
+#include "stdafx.h"
 
 //NumPy license
 //
