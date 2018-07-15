@@ -29,6 +29,7 @@
 #define NAME_SIZE 100
 //#define GRAPH_FILE_NAME "inceptionv3.graph"
 #define GRAPH_FILE_NAME "ssd.graph"
+#define IMAGE_FILE_NAME "image.jpg"
 
 typedef unsigned short half;
 const int networkDim = 300;
@@ -230,7 +231,7 @@ int main(int argc, char** argv)
     // Subtract network mean for each value in each channel. Then convert
     // floats to half precision floats.
     // Return pointer to the buffer of half precision floats. 
-    imageBufFp16 = LoadImage("image.jpg", networkDim, networkMean);
+    imageBufFp16 = LoadImage(IMAGE_FILE_NAME, networkDim, networkMean);
     
     // Start the inference with mvncLoadTensor()
     retCode = mvncLoadTensor(graphHandle, imageBufFp16, lenBufFp16, NULL);
@@ -260,8 +261,20 @@ int main(int argc, char** argv)
     num_of_detection = (unsigned int)fp[0];
 
 
-    for (int i = 0; i < 707; i++) {
-      printf("%d, %d , %f\n",i, *( (half*)resultData16+i ) ,*(fp+i));
+    for (int i = 0; i < num_of_detection; i++) {
+      //printf("%d, %d , %f\n",i, *( (half*)resultData16+i ) ,*(fp+i));
+      int base_index = 7 * (i + 1);
+      printf(">>>Detection No.%d\n", i);
+      printf("class : %d\n", (int)fp[base_index + 1]);
+      printf("score : %f\n", fp[base_index + 2]);
+      printf("box : %f, %f, %f, %f \n\n",
+              fp[base_index + 3],
+              fp[base_index + 4],
+              fp[base_index + 5],
+              fp[base_index + 6]
+        );
+      
+
     }
     
     
