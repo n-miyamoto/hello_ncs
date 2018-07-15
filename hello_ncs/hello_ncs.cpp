@@ -176,7 +176,8 @@ int main(int argc, char** argv)
     void* resultData16 = NULL;
     void* userParam = NULL;
     unsigned int lenResultData=0;
-        
+    unsigned int num_of_detection;
+
     // Calculate the length of the buffer that contains the half precision floats.
     // 3 channels * width * height * sizeof a 16-bit float 
     unsigned int lenBufFp16 = 3*networkDim*networkDim*sizeof(*imageBufFp16);
@@ -240,7 +241,7 @@ int main(int argc, char** argv)
     }
     printf("Successfuly load tensor. \n");
 
-    //TODO : get result from graph
+    //Get result from graph
     retCode = mvncGetResult(graphHandle, &resultData16, &lenResultData, &userParam);
     if (retCode != MVNC_OK)
     {
@@ -250,8 +251,17 @@ int main(int argc, char** argv)
     printf("Successfuly get result. \n");
     printf("resultData is %d bytes which is %d 16-bit floats.\n", lenResultData, lenResultData/(int)sizeof(half));
     
+
+    //convert the result to float
+    float *fp;
+    fp = (float*)malloc(lenResultData * sizeof(float));
+    fp16tofloat( fp, (unsigned char*)resultData16, 707);
+
+    num_of_detection = (unsigned int)fp[0];
+
+
     for (int i = 0; i < 707; i++) {
-      printf("%d, %d\n",i, *( (half*)resultData16+i ) );
+      printf("%d, %d , %f\n",i, *( (half*)resultData16+i ) ,*(fp+i));
     }
     
     
@@ -265,7 +275,6 @@ int main(int argc, char** argv)
     //close device
 close_device:
     retCode = mvncCloseDevice(deviceHandle);
-
     deviceHandle = NULL;
     if (retCode != MVNC_OK)
     {
